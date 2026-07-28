@@ -10,67 +10,58 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
   FRONTEND_DIRECTORY: starter/frontend
-  REACT_APP_MOVIE_API_URL: http://localhost:5000
+  NODE_VERSION: '18'
 
 jobs:
   lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ${{ env.FRONTEND_DIRECTORY }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup NodeJS
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('starter/frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-frontend-npm-
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIRECTORY }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.FRONTEND_DIRECTORY }}
         run: npm ci
 
-      - name: Run lint
-        working-directory: ${{ env.FRONTEND_DIRECTORY }}
+      - name: Run frontend lint
         run: npm run lint
 
   test:
     name: Frontend Test
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ${{ env.FRONTEND_DIRECTORY }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup NodeJS
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('starter/frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-frontend-npm-
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIRECTORY }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.FRONTEND_DIRECTORY }}
         run: npm ci
 
-      - name: Run tests
-        working-directory: ${{ env.FRONTEND_DIRECTORY }}
+      - name: Run frontend tests
         run: CI=true npm run test
 
   build:
@@ -80,13 +71,29 @@ jobs:
       - lint
       - test
 
+    defaults:
+      run:
+        working-directory: ${{ env.FRONTEND_DIRECTORY }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        working-directory: ${{ env.FRONTEND_DIRECTORY }}
-        run: |
-          docker build \
-            --build-arg=REACT_APP_MOVIE_API_URL=${{ env.REACT_APP_MOVIE_API_URL }} \
-            --tag mp-frontend:latest .
+      - name: Setup Node.js for build
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIRECTORY }}/package-lock.json
+
+      - name: Install dependencies for build
+        run: npm ci
+
+      - name: Run frontend tests before Docker build
+        run: CI=true npm run test
+
+      - name: Build frontend application
+        run: npm run build
+
+      - name: Build frontend Docker image
+        run: docker build -t frontend-ci .
